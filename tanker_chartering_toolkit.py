@@ -4,7 +4,7 @@ Tanker Chartering Toolkit
 Tiga modul dalam satu aplikasi Streamlit:
 
   1. Worldscale Freight Calculation   — konversi flat rate (WS100) + WS% menjadi freight USD.
-  2. Voyage Estimate & TCE Calculator — freight, bunker, biaya pelabuhan, dan waktu voyage
+  2. Voyage Estimate & TCE Calculation — freight, bunker, biaya pelabuhan, dan waktu voyage
                                         menjadi TCE, dengan toggle Domestik/Internasional
                                         dan toggle mata uang USD/IDR.
   3. Laytime & Demurrage/Despatch     — allowed laytime, waktu terpakai, demurrage/despatch.
@@ -52,8 +52,12 @@ with tab_ws:
     st.subheader("⚓ Worldscale Freight Calculation")
     st.markdown(
         """
-**Worldscale (Worldwide Tanker Nominal Freight Scale)** adalah sistem indeks acuan atau daftar tarif standar yang digunakan untuk menentukan biaya pengangkutan kargo minyak dan produk turunannya menggunakan kapal tanker. Worldscale adalah tabel referensi tarif dasar (*flat rate*) per ton untuk ratusan ribu rute pelayaran di seluruh dunia. Tarif dasar dihitung berdasarkan asumsi kapal standar berukuran 75.000 deadweight tonnage (DWT), kecepatan 14,5 knot, biaya operasional harian tetap (sebesar $12.000), serta estimasi biaya bahan bakar (bunker) dan pelabuhan. Negosiasi harga antara pemilik kapal (*shipowner*) dan penyewa (*charterer*) dilakukan berdasarkan persentase dari tarif dasar Worldscale (disebut *WS points*). Contoh: WS100 berarti biaya sewa persis 100% dari tarif dasar yang tercantum. Jika pasar sedang tinggi, tarif bisa disepakati pada WS150 (150% dari tarif dasar), atau WS80 (80%) jika pasar sedang turun.
-        """
+<div style="text-align: justify; text-justify: inter-word;">
+(Worldwide Tanker Nominal Freight Scale)<br>
+Sistem indeks acuan atau daftar tarif standar yang digunakan untuk menentukan biaya pengangkutan kargo minyak dan produk turunannya menggunakan kapal tanker. Worldscale adalah tabel referensi tarif dasar (flat rate) per ton untuk ratusan ribu rute pelayaran di seluruh dunia. Tarif dasar dihitung berdasarkan asumsi kapal standar berukuran 75.000 deadweight tonnage (DWT), kecepatan 14,5 knot, biaya operasional harian tetap (sebesar $12.000), serta estimasi biaya bahan bakar (bunker) dan pelabuhan. Negosiasi harga antara pemilik kapal (shipowner) dan penyewa (charterer) dilakukan berdasarkan persentase dari tarif dasar Worldscale (disebut WS points). Contoh: WS100 berarti biaya sewa persis 100% dari tarif dasar yang tercantum. Jika pasar sedang tinggi, tarif bisa disepakati pada WS150 (150% dari tarif dasar), atau WS80 (80%) jika pasar sedang turun.
+</div>
+        """,
+        unsafe_allow_html=True,
     )
     st.latex(r"\text{Freight (USD)} = \text{Cargo Qty (MT)} \times \text{Flat Rate WS100 (USD/MT)} \times \frac{\text{WS\%}}{100}")
 
@@ -98,13 +102,12 @@ with tab_ws:
 # TAB 2 — VOYAGE ESTIMATE / TCE CALCULATOR
 # ==============================================================================
 with tab_voy:
-    st.subheader("🧮 Voyage Estimate & TCE Calculator")
+    st.subheader("🧮 Voyage Estimate & TCE Calculation")
     st.latex(
         r"\text{TCE (per hari)} = \frac{\text{Net Freight} - \text{Voyage Costs}}{\text{Voyage Days}} \;(+\, \text{OPEX/hari, opsional})"
     )
 
-    # ---- 0) Tipe voyage & mata uang ----
-    st.markdown("##### 0) Tipe voyage & mata uang")
+    # ---- Tipe voyage & mata uang ----
     c1, c2 = st.columns(2)
     with c1:
         voyage_type = st.radio(
@@ -242,13 +245,13 @@ with tab_voy:
 
         st.markdown("**Biaya pelabuhan & lainnya**")
         use_pelindo = st.checkbox(
-            "Gunakan rincian biaya pelabuhan gaya Indonesia (Pelindo/PNBP: labuh, tambat, pandu, tunda, dermaga/PBM)",
+            "Gunakan rincian biaya pelabuhan Indonesia (Pelindo/PNBP: labuh, tambat, pandu, tunda, dermaga/PBM)",
             value=is_domestic,
             key="voy_use_pelindo",
         )
 
         def pelindo_breakdown(label: str, key_prefix: str) -> float:
-            with st.expander(f"Rincian biaya {label} (gaya Pelindo/PNBP)"):
+            with st.expander(f"Rincian biaya {label} (Pelindo/PNBP)"):
                 p1, p2, p3 = st.columns(3)
                 with p1:
                     labuh = st.number_input(f"Labuh ({symbol})", min_value=0.0, value=0.0, key=f"{key_prefix}_labuh")
@@ -279,7 +282,7 @@ with tab_voy:
         c1, c2 = st.columns(2)
         with c1:
             canal_cost = st.number_input(
-                f"Biaya kanal / lain-lain ({symbol})", min_value=0.0, value=d(0.0), step=500.0, key="voy_canal_cost"
+                f"Biaya Lain-lain ({symbol})", min_value=0.0, value=d(0.0), step=500.0, key="voy_canal_cost"
             )
         with c2:
             opex_day = st.number_input(
@@ -463,12 +466,6 @@ with tab_voy:
         else:
             st.warning("Lengkapi data voyage days, cargo quantity, dan komisi (<100%) terlebih dahulu.")
 
-    st.caption(
-        "Formula: Handybulk — Voyage Estimation (Time at Sea, Port Days & TCE), TCE — Time Charter Equivalent. "
-        "Extended TCE (+OPEX/hari): The Signal Group — TCE Benchmarking: A Tanker Operator's Guide; "
-        "Heisenberg Shipping — Time Charter Equivalent (TCE)."
-    )
-
 # ==============================================================================
 # TAB 3 — LAYTIME & DEMURRAGE/DESPATCH CALCULATOR
 # ==============================================================================
@@ -589,8 +586,3 @@ Berlaku universal untuk fixture domestik maupun internasional.
     else:
         r3.metric("Selisih", "0.00 jam")
         st.info("⚪ Laytime terpakai persis sama dengan allowed laytime — tidak ada demurrage/despatch.")
-
-    st.caption(
-        "Metodologi: Handybulk — Laytime, Calculation of Demurrage, Laytime/Demurrage/Despatch Explained. "
-        "Konvensi despatch 50%: Heisenberg Shipping — Online Laytime Calculator Tool."
-    )
