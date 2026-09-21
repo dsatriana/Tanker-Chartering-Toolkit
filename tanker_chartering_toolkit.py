@@ -1,36 +1,15 @@
 """
-Tanker Chartering Toolkit (Merged, disesuaikan pasar Indonesia)
-================================================================
-Gabungan dua kalkulator chartering tanker menjadi satu toolkit, tanpa modul
-yang tumpang tindih, dan disesuaikan untuk konteks pasar Indonesia (khususnya
-voyage domestik/cabotase) sambil tetap mempertahankan standar global
-(Worldscale, USD) untuk voyage internasional.
+Tanker Chartering Toolkit
+=========================
+Tiga modul dalam satu aplikasi Streamlit:
 
-  1. Worldscale Freight Calculator      — standar GLOBAL, tetap dipertahankan
-                                           utuh untuk voyage internasional.
-  2. Voyage Estimate & TCE Calculator   — gabungan terlengkap dari kedua
-                                           project sumber, kini dengan:
-                                             - toggle Domestik (cabotase) /
-                                               Internasional
-                                             - toggle mata uang USD / IDR
-                                             - preset ukuran kapal (kapal
-                                               kecil/menengah domestik vs
-                                               kapal besar internasional)
-                                             - opsi rincian biaya pelabuhan
-                                               gaya Indonesia (Pelindo/PNBP:
-                                               labuh, tambat, pandu, tunda,
-                                               dermaga/PBM)
-  3. Laytime & Demurrage/Despatch       — universal, dengan toggle mata uang
-                                           USD/IDR untuk fixture domestik.
+  1. Worldscale Freight Calculation   — konversi flat rate (WS100) + WS% menjadi freight USD.
+  2. Voyage Estimate & TCE Calculator — freight, bunker, biaya pelabuhan, dan waktu voyage
+                                        menjadi TCE, dengan toggle Domestik/Internasional
+                                        dan toggle mata uang USD/IDR.
+  3. Laytime & Demurrage/Despatch     — allowed laytime, waktu terpakai, demurrage/despatch.
 
-Modul "Charter Party Reference" dari salah satu project sumber SENGAJA
-dihapus atas permintaan pengguna (referensi statis, bentuk kontrak oil-major
-yang jarang dipakai pada fixture domestik Indonesia).
-
-Alat bantu edukasi/estimasi. Bukan pengganti wording charter party yang
-sebenarnya, tabel Worldscale berlisensi resmi, tarif PNBP/Pelindo resmi, kurs
-live, atau nasihat komersial/hukum profesional. Lihat catatan konteks pasar
-Indonesia di tab Ringkasan.
+Nama pelabuhan load/discharge diisi manual (diketik).
 """
 
 from pathlib import Path
@@ -51,45 +30,15 @@ st.set_page_config(
     layout="wide",
 )
 
-
-@st.cache_data
-def load_ports():
-    path = APP_DIR / "indonesia_ports.csv"
-    if path.exists():
-        return pd.read_csv(path)
-    return pd.DataFrame({"portname": [], "region": []})
-
-
-ports_df = load_ports()
-port_options = ["(Pelabuhan lain / manual)"] + sorted(ports_df["portname"].tolist())
-
-# Preset ukuran kapal — angka ilustratif/ballpark, BUKAN data manufaktur resmi.
-# Kapal kecil/menengah mencerminkan armada domestik Indonesia yang umumnya
-# jauh lebih kecil dari kapal parcel/crude internasional (Aframax/VLCC dst.).
-VESSEL_PRESETS = {
-    "Kapal kecil domestik (± 3.000–5.000 DWT, coaster)": dict(
-        voy_qty=3_000.0, voy_speed_laden=9.5, voy_speed_ballast=10.0,
-        voy_ifo_laden=0.0, voy_ifo_ballast=0.0, voy_ifo_port=0.0,
-        voy_mdo_sea=3.5, voy_mdo_port=1.0,
-    ),
-    "Kapal menengah domestik (± 6.500–17.500 DWT)": dict(
-        voy_qty=12_000.0, voy_speed_laden=11.0, voy_speed_ballast=11.5,
-        voy_ifo_laden=6.0, voy_ifo_ballast=5.0, voy_ifo_port=0.5,
-        voy_mdo_sea=1.0, voy_mdo_port=1.0,
-    ),
-    "Kapal besar / rute internasional (mis. Aframax 80.000+ DWT)": dict(
-        voy_qty=80_000.0, voy_speed_laden=12.5, voy_speed_ballast=13.0,
-        voy_ifo_laden=28.0, voy_ifo_ballast=26.0, voy_ifo_port=3.0,
-        voy_mdo_sea=1.0, voy_mdo_port=2.0,
-    ),
-}
+# Faktor skala internal untuk default nilai saat mata uang = IDR
+# (hanya untuk mengisi angka awal input; tidak ditampilkan dan tidak memengaruhi kalkulasi).
+DEFAULT_FX_IDR_PER_USD = 17_700.0
 
 st.title("🛢️ Tanker Chartering Toolkit")
 st.caption("Worldscale freight · Voyage estimate (TCE) · Laytime & demurrage/despatch")
 
-tab_home, tab_ws, tab_voy, tab_lay = st.tabs(
+tab_ws, tab_voy, tab_lay = st.tabs(
     [
-        "🏠 Ringkasan",
         "⚓ Worldscale Freight",
         "🧮 Voyage Estimate (TCE)",
         "⏱️ Laytime & Demurrage",
@@ -97,124 +46,13 @@ tab_home, tab_ws, tab_voy, tab_lay = st.tabs(
 )
 
 # ==============================================================================
-# TAB 0 — HOME
-# ==============================================================================
-with tab_home:
-    st.subheader("Tentang toolkit ini")
-    st.markdown(
-        """
-Tiga modul yang saling terkait, disusun mengikuti alur kerja chartering desk /
-voyage estimator untuk tanker:
-
-| Modul | Fungsi |
-|---|---|
-| **⚓ Worldscale Freight** | Konversi flat rate (WS100) + WS% menjadi freight USD. Standar **global**, dipakai terutama untuk voyage internasional. Hasilnya bisa ditarik langsung ke tab Voyage Estimate. |
-| **🧮 Voyage Estimate (TCE)** | Gabungkan freight, bunker (2 grade), biaya pelabuhan/kanal, dan waktu voyage (laden/ballast terpisah) menjadi TCE — dengan toggle **Domestik/Internasional**, **USD/IDR**, preset ukuran kapal, dan pilihan rincian biaya pelabuhan gaya Indonesia (Pelindo). |
-| **⏱️ Laytime & Demurrage** | Hitung allowed laytime, waktu terpakai, dan demurrage/despatch payable — berlaku universal, dengan pilihan mata uang USD/IDR. |
-
-Freight rate dari tab Worldscale bisa ditarik langsung ke tab Voyage Estimate
-(pilih basis freight "Dari Worldscale") — tanpa perlu memasukkan flat rate &
-WS% dua kali.
-        """
-    )
-
-    st.warning(
-        "⚠️ **Disclaimer:** Ini alat bantu edukasi/estimasi. Flat rate Worldscale "
-        "aktual bersifat proprietary (berlangganan). Tarif pelabuhan gaya Pelindo/PNBP "
-        "pada tab Voyage Estimate adalah **struktur ilustratif** (bukan tabel tarif resmi "
-        "terbaru) — isi dengan tarif aktual dari agen/Pelindo setempat. Kurs USD/IDR yang "
-        "ditampilkan adalah **referensi ilustratif saja, bukan kurs live** — selalu cek "
-        "kurs terkini sebelum dipakai untuk keputusan komersial. Daftar pelabuhan Indonesia "
-        "pada tab Voyage Estimate adalah contoh awal (starter list), bukan basis data resmi."
-    )
-
-    with st.expander("🇮🇩 Catatan konteks pasar Indonesia", expanded=True):
-        st.markdown(
-            """
-- **Worldscale** dirancang untuk fixture tanker **internasional** pada rute-rute
-  yang sudah punya flat rate resmi. Ini relevan untuk voyage lintas negara yang
-  melibatkan pelabuhan Indonesia (ekspor/impor crude & products), tapi **tidak
-  dipakai** untuk pelayaran domestik antar-pulau — karena itu, opsi "Dari
-  Worldscale" otomatis disembunyikan saat Anda memilih mode **Domestik** di
-  tab Voyage Estimate, dan hanya muncul lagi pada mode **Internasional**.
-- Pelayaran domestik Indonesia tunduk pada **asas cabotage** (Inpres No.
-  5/2005 dan aturan turunannya): kapal harus berbendera Indonesia & dioperasikan
-  perusahaan pelayaran nasional. Ini faktor **kelayakan/kepatuhan**, bukan
-  sesuatu yang otomatis dicek kalkulator — muncul sebagai pengingat saat mode
-  Domestik dipilih.
-- Armada domestik Indonesia (products/CPO/BBM/aspal, dsb.) umumnya jauh **lebih
-  kecil** dari kapal parcel/crude internasional — karena itu tab Voyage Estimate
-  kini punya **preset ukuran kapal** (kecil/menengah domestik vs besar
-  internasional) agar default kecepatan & konsumsi bahan bakar tidak bias ke
-  ukuran kapal internasional.
-- Biaya pelabuhan domestik umumnya mengikuti struktur **Pelindo/PNBP** (labuh,
-  tambat, pandu, tunda, dermaga/PBM) — bukan satu angka lumpsum "port
-  disbursement" seperti kebiasaan agensi internasional. Tab Voyage Estimate
-  punya opsi untuk merinci biaya dengan struktur ini.
-- Fixture domestik lazim dinegosiasikan dalam **Rupiah**, sedangkan fixture
-  internasional & Worldscale selalu dalam **USD** — tab Voyage Estimate & tab
-  Laytime kini punya toggle mata uang untuk ini.
-- Istilah bahan bakar "IFO" dan "MDO" dipertahankan sesuai kebiasaan lama;
-  sejak IMO 2020 sebagian besar kapal tanpa scrubber memakai **VLSFO** &
-  **LSMGO**, dan banyak kapal kecil domestik hanya memakai satu jenis bahan
-  bakar (MDO/MGO/Solar) sama sekali tanpa HFO — preset kapal kecil domestik
-  sudah mencerminkan ini (konsumsi grade pertama = 0).
-            """
-        )
-
-    with st.expander("📚 Sumber & referensi", expanded=False):
-        st.markdown(
-            """
-**Worldscale**
-- Worldscale Association (London) Ltd. / Worldscale Association (NYC) Inc. — penerbit resmi
-  *New Worldwide Tanker Nominal Freight Scale* tahunan — [worldscale.co.uk](https://www.worldscale.co.uk)
-- Baltic Exchange — [Guide to Modern Shipping: Tanker Chartering](https://www.balticexchange.com/en/who-we-are/guide-to-modern-shipping/tanker-chartering.html)
-- INTERTANKO — [Topics & Issues: Worldscale](https://www.intertanko.com/topics-issues/issue/worldscale)
-- Wikipedia — [Worldscale](https://en.wikipedia.org/wiki/Worldscale)
-- gCaptain — contoh flat rate 2026 Houston–New York, [Waiving the Jones Act Won't Lower Gas Prices](https://gcaptain.com/opinion-waiving-the-jones-act-wont-lower-gas-prices-tanker-markets-prove-it/)
-
-**Laytime & demurrage**
-- Handybulk — seri artikel [Laytime](https://www.handybulk.com/laytime/),
-  [Calculation of Demurrage](https://www.handybulk.com/calculation-of-demurrage),
-  [Laytime, Demurrage & Despatch Explained](https://www.handybulk.com/laytime-demurrage-and-despatch-in-ship-chartering-explained/)
-- Heisenberg Shipping — [Online Laytime Calculator](https://heisenbergshipping.com/online-laytime-calculator-tool/) (konvensi despatch = 50% demurrage)
-
-**Voyage estimate & TCE**
-- Handybulk — [Voyage Estimation: Time at Sea](https://www.handybulk.com/voyage-estimation-time-at-sea-distance-speed-bunker-consumption-weather-allowance-and-tce/),
-  [Voyage Estimation: Port Days & TCE](https://www.handybulk.com/?p=1813),
-  [TCE — Time Charter Equivalent](https://www.handybulk.com/tce-time-charter-equivalent/)
-- The Signal Group — [TCE Benchmarking: A Tanker Operator's Guide](https://www.thesignalgroup.com/newsroom/tce-benchmarking-tanker-operators-guide)
-- Heisenberg Shipping — [Time Charter Equivalent (TCE)](https://heisenbergshipping.com/time-charter-equivalent-tce/)
-
-**Konteks pasar Indonesia**
-- Asas cabotage: Instruksi Presiden No. 5 Tahun 2005 tentang Pemberdayaan Industri
-  Pelayaran Nasional, dan Undang-Undang No. 17 Tahun 2008 tentang Pelayaran.
-- Struktur tarif pelabuhan (labuh, tambat, pandu, tunda, dermaga) mengikuti
-  praktik umum PNBP kepelabuhanan Indonesia (PT Pelindo) — cek tarif resmi
-  terbaru pada agen/Pelindo setempat, karena berubah dari waktu ke waktu.
-
-Semua angka default (harga bunker, biaya pelabuhan, freight rate, kurs, dsb.)
-adalah **placeholder** untuk demonstrasi — ganti dengan data pasar terkini
-Anda sebelum dipakai untuk keputusan komersial.
-            """
-        )
-
-# ==============================================================================
-# TAB 1 — WORLDSCALE FREIGHT CALCULATOR (standar global — tidak diubah)
+# TAB 1 — WORLDSCALE FREIGHT CALCULATION
 # ==============================================================================
 with tab_ws:
-    st.subheader("⚓ Worldscale Freight Calculator")
-    st.caption("Standar global — dipertahankan penuh untuk voyage internasional.")
+    st.subheader("⚓ Worldscale Freight Calculation")
     st.markdown(
         """
-**Worldscale (WS)** adalah sistem referensi standar untuk menegosiasikan freight
-tanker. Setiap tahun, *Worldscale Association (London) Ltd* dan
-*Worldscale Association (NYC) Inc* menerbitkan **flat rate (WS100)** — dalam
-USD per metric ton — untuk ratusan ribu kombinasi rute pelabuhan muat/bongkar,
-dihitung berdasarkan kapal notional **75.000 DWT**, kecepatan dinas **14,5 knot**,
-konsumsi bunker transit **55 MT/hari**, dan waktu pelabuhan tetap **4 hari**, agar
-setiap voyage secara teoritis menghasilkan *daily return* yang setara bagi owner.
-Freight aktual dinegosiasikan sebagai **persentase dari flat rate** — 1 WS point = 1%.
+**Worldscale (Worldwide Tanker Nominal Freight Scale)** adalah sistem indeks acuan atau daftar tarif standar yang digunakan untuk menentukan biaya pengangkutan kargo minyak dan produk turunannya menggunakan kapal tanker. Worldscale adalah tabel referensi tarif dasar (*flat rate*) per ton untuk ratusan ribu rute pelayaran di seluruh dunia. Tarif dasar dihitung berdasarkan asumsi kapal standar berukuran 75.000 deadweight tonnage (DWT), kecepatan 14,5 knot, biaya operasional harian tetap (sebesar $12.000), serta estimasi biaya bahan bakar (bunker) dan pelabuhan. Negosiasi harga antara pemilik kapal (*shipowner*) dan penyewa (*charterer*) dilakukan berdasarkan persentase dari tarif dasar Worldscale (disebut *WS points*). Contoh: WS100 berarti biaya sewa persis 100% dari tarif dasar yang tercantum. Jika pasar sedang tinggi, tarif bisa disepakati pada WS150 (150% dari tarif dasar), atau WS80 (80%) jika pasar sedang turun.
         """
     )
     st.latex(r"\text{Freight (USD)} = \text{Cargo Qty (MT)} \times \text{Flat Rate WS100 (USD/MT)} \times \frac{\text{WS\%}}{100}")
@@ -230,8 +68,7 @@ Freight aktual dinegosiasikan sebagai **persentase dari flat rate** — 1 WS poi
             value=10.88,
             step=0.01,
             key="ws_flat",
-            help="Contoh ilustratif: flat rate Houston–New York 2026 = USD 10.88/mt (gCaptain, 2026). "
-            "Masukkan flat rate dari tabel Worldscale berlisensi Anda untuk rute yang sesungguhnya.",
+            help="Masukkan flat rate dari tabel Worldscale berlisensi Anda untuk rute yang sesungguhnya.",
         )
     with col2:
         ws_pct = st.number_input(
@@ -257,38 +94,11 @@ Freight aktual dinegosiasikan sebagai **persentase dari flat rate** — 1 WS poi
     m3.metric(f"Komisi ({ws_comm:.2f}%)", f"${ws_comm_amt:,.0f}")
     m4.metric("Net Freight", f"${ws_net:,.0f}")
 
-    st.info(
-        "➡️ Rate efektif di atas otomatis tersedia di tab **🧮 Voyage Estimate (TCE)** "
-        "saat mode **Internasional** dipilih — opsi \"Dari Worldscale\" akan terisi "
-        "otomatis dengan nilai ini (tetap bisa diedit manual)."
-    )
-
-    st.markdown("###### Contoh ilustratif flat rate (bukan tabel resmi — hanya untuk orientasi)")
-    example_df = pd.DataFrame(
-        [
-            {"Rute": "Yokohama → Adelaide", "Flat Rate (USD/MT)": 10.60, "Jarak (nm)": 10_574, "Sumber": "Wikipedia — Worldscale"},
-            {"Rute": "Houston → New York (2026)", "Flat Rate (USD/MT)": 10.88, "Jarak (nm)": "-", "Sumber": "gCaptain, 2026"},
-        ]
-    )
-    st.dataframe(example_df, hide_index=True, use_container_width=True)
-    st.caption(
-        "Tabel flat rate resmi & lengkap bersifat berlangganan — akses melalui Worldscale Association "
-        "(worldscale.co.uk) atau penyedia harga seperti Platts/S&P Global Commodity Insights, Argus, atau Baltic Exchange. "
-        "Worldscale umumnya dipakai untuk fixture *internasional*, bukan pelayaran domestik dalam negeri Indonesia."
-    )
-
 # ==============================================================================
-# TAB 2 — VOYAGE ESTIMATE / TCE CALCULATOR (gabungan + disesuaikan Indonesia)
+# TAB 2 — VOYAGE ESTIMATE / TCE CALCULATOR
 # ==============================================================================
 with tab_voy:
     st.subheader("🧮 Voyage Estimate & TCE Calculator")
-    st.markdown(
-        """
-**Time Charter Equivalent (TCE)** menormalkan hasil sebuah voyage charter ke
-basis harian, sehingga bisa dibandingkan langsung dengan tawaran time charter
-hire — untuk voyage domestik maupun internasional.
-        """
-    )
     st.latex(
         r"\text{TCE (per hari)} = \frac{\text{Net Freight} - \text{Voyage Costs}}{\text{Voyage Days}} \;(+\, \text{OPEX/hari, opsional})"
     )
@@ -308,9 +118,7 @@ hire — untuk voyage domestik maupun internasional.
             st.info(
                 "Voyage domestik tunduk pada **asas cabotage** (Inpres No. 5/2005 & "
                 "UU No. 17/2008 tentang Pelayaran): kapal harus berbendera Indonesia "
-                "dan dioperasikan perusahaan pelayaran nasional. Kalkulator ini tidak "
-                "mengecek kepatuhan tersebut secara otomatis — pastikan kelayakan ini "
-                "terpenuhi sebelum fixture."
+                "dan dioperasikan perusahaan pelayaran nasional."
             )
     with c2:
         default_currency_index = 1 if is_domestic else 0
@@ -322,39 +130,10 @@ hire — untuk voyage domestik maupun internasional.
             key="voy_currency",
         )
         symbol = "$" if currency.startswith("USD") else "Rp"
-        fx_rate = st.number_input(
-            "Kurs referensi (Rp per USD) — info silang saja, tidak memengaruhi kalkulasi",
-            min_value=0.0,
-            value=17_700.0,
-            step=50.0,
-            key="voy_fx_rate",
-            help="Ilustrasi saja (kurs pertengahan September 2026 berkisar ~Rp17.700/USD) — "
-            "BUKAN kurs live. Cek kurs aktual sebelum dipakai untuk keputusan komersial.",
-        )
 
     def d(usd_value: float) -> float:
         """Skala nilai default USD ke IDR (ilustrasi) bila mata uang = IDR."""
-        return usd_value if symbol == "$" else round(usd_value * fx_rate, -3)
-
-    # ---- Preset ukuran kapal ----
-    st.markdown("##### Preset ukuran kapal (opsional)")
-    preset_choice = st.selectbox(
-        "Pilih preset untuk mengisi otomatis kecepatan & konsumsi di bawah (bisa diedit manual setelahnya)",
-        ["(Manual / custom — tidak mengubah apa pun)"] + list(VESSEL_PRESETS.keys()),
-        key="voy_preset",
-    )
-    if preset_choice in VESSEL_PRESETS:
-        if st.button("Terapkan preset ke input di bawah", key="voy_apply_preset"):
-            for k, v in VESSEL_PRESETS[preset_choice].items():
-                st.session_state[k] = v
-            st.rerun()
-    st.caption(
-        "Preset bersifat ilustratif (bukan data manufaktur kapal spesifik) — dibuat karena "
-        "armada domestik Indonesia umumnya jauh lebih kecil dari kapal parcel/crude "
-        "internasional. Preset kapal kecil domestik sengaja tidak memakai bahan bakar grade "
-        "pertama (mis. IFO/HFO) karena kapal sekecil itu umumnya hanya berbahan bakar "
-        "MDO/MGO/Solar."
-    )
+        return usd_value if symbol == "$" else round(usd_value * DEFAULT_FX_IDR_PER_USD, -3)
 
     sub_cargo, sub_speed, sub_days, sub_bunker = st.tabs(
         ["🗺️ Voyage & Freight", "🚢 Kecepatan & Konsumsi", "⚓ Hari & Biaya Pelabuhan", "⛽ Harga Bunker"]
@@ -364,7 +143,9 @@ hire — untuk voyage domestik maupun internasional.
     with sub_cargo:
         c1, c2 = st.columns(2)
         with c1:
-            load_port = st.selectbox("Pelabuhan muat (load port)", port_options, index=0, key="voy_load_port")
+            load_port = st.text_input(
+                "Pelabuhan muat (load port)", key="voy_load_port", placeholder="Ketik nama pelabuhan"
+            ).strip()
             laden_distance = st.number_input(
                 "Jarak laden (load → discharge), NM", min_value=0.0, value=800.0, step=10.0, key="voy_laden_nm"
             )
@@ -381,9 +162,9 @@ hire — untuk voyage domestik maupun internasional.
                 key="voy_ballast_nm",
             )
         with c2:
-            discharge_port = st.selectbox(
-                "Pelabuhan bongkar (discharge port)", port_options, index=0, key="voy_disch_port"
-            )
+            discharge_port = st.text_input(
+                "Pelabuhan bongkar (discharge port)", key="voy_disch_port", placeholder="Ketik nama pelabuhan"
+            ).strip()
 
             # Worldscale hanya relevan untuk voyage internasional
             if is_domestic:
@@ -424,7 +205,7 @@ hire — untuk voyage domestik maupun internasional.
                 if symbol == "Rp":
                     st.caption(
                         "⚠️ Freight di atas tetap dalam **USD** (bawaan Worldscale). Bila tampilan "
-                        "Anda diset ke IDR, konversikan manual memakai kurs referensi di atas."
+                        "Anda diset ke IDR, konversikan manual memakai kurs terkini."
                     )
             addr_comm = st.number_input("Address commission (%)", min_value=0.0, value=1.25, step=0.25, key="voy_addr_comm")
             broker_comm = st.number_input("Brokerage commission (%)", min_value=0.0, value=1.25, step=0.25, key="voy_broker_comm")
@@ -445,10 +226,6 @@ hire — untuk voyage domestik maupun internasional.
             st.markdown("**Konsumsi bahan bakar sekunder, mis. MDO/MGO (MT/hari)**")
             mdo_sea = st.number_input("Saat berlayar (laden & ballast)", min_value=0.0, value=1.0, step=0.5, key="voy_mdo_sea")
             mdo_port = st.number_input("Saat di pelabuhan", min_value=0.0, value=2.0, step=0.5, key="voy_mdo_port")
-        st.caption(
-            "Kapal kecil domestik umumnya hanya pakai satu jenis bahan bakar (MDO/MGO/Solar) — "
-            "kosongkan/nolkan grade pertama bila tidak berlaku, atau pakai preset di atas."
-        )
 
     # ---- Sub-tab: Days & Port Costs ----
     with sub_days:
@@ -462,11 +239,6 @@ hire — untuk voyage domestik maupun internasional.
             other_days = st.number_input(
                 "Hari tambahan lain (bunkering/waiting)", min_value=0.0, value=0.0, step=0.25, key="voy_other_days"
             )
-        st.caption(
-            "Loading/discharging rate cargo curah domestik (CPO, BBM, aspal, dll.) bervariasi "
-            "tergantung fasilitas pelabuhan setempat — sesuaikan hari pelabuhan dengan "
-            "pengalaman aktual di pelabuhan tersebut, bukan asumsi rate internasional."
-        )
 
         st.markdown("**Biaya pelabuhan & lainnya**")
         use_pelindo = st.checkbox(
@@ -551,6 +323,7 @@ hire — untuk voyage domestik maupun internasional.
 
     ifo_qty = (sea_days_laden * ifo_laden) + (sea_days_ballast * ifo_ballast) + (total_port_days * ifo_port)
     mdo_qty = (total_sea_days * mdo_sea) + (total_port_days * mdo_port)
+    total_fuel_qty = ifo_qty + mdo_qty
     bunker_cost = (ifo_qty * ifo_price) + (mdo_qty * mdo_price)
 
     total_commission_pct = addr_comm + broker_comm
@@ -569,6 +342,8 @@ hire — untuk voyage domestik maupun internasional.
     # HASIL
     # -------------------------------------------------------------------
     st.markdown("## 📊 Hasil Voyage Estimate")
+    if load_port or discharge_port:
+        st.caption(f"Rute: **{load_port or '-'}** → **{discharge_port or '-'}**")
 
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Total Voyage Days", f"{total_voyage_days:,.2f} hari")
@@ -589,9 +364,9 @@ hire — untuk voyage domestik maupun internasional.
             ("Gross Freight", f"{symbol} {gross_freight:,.0f}"),
             (f"- Komisi ({total_commission_pct:.2f}%)", f"{symbol} {commission_amount:,.0f}"),
             ("= Net Freight", f"{symbol} {net_freight:,.0f}"),
-            ("- Biaya Bunker (2 grade)", f"{symbol} {bunker_cost:,.0f}"),
+            ("- Biaya Bunker", f"{symbol} {bunker_cost:,.0f}"),
             ("- Biaya Pelabuhan (Load + Discharge)", f"{symbol} {port_costs_total:,.0f}"),
-            ("- Biaya Kanal/Lain-lain", f"{symbol} {other_costs_total:,.0f}"),
+            ("- Biaya Lain-lain", f"{symbol} {other_costs_total:,.0f}"),
             ("= Net Voyage Result", f"{symbol} {net_voyage_result:,.0f}"),
             ("÷ Total Voyage Days", f"{total_voyage_days:,.2f} hari"),
             ("= TCE dasar (per hari)", f"{symbol} {tce_base:,.0f}"),
@@ -609,19 +384,15 @@ hire — untuk voyage domestik maupun internasional.
                     "Sea days (laden)",
                     "Sea days (ballast)",
                     "Port days (load+discharge)",
-                    "Canal days",
                     "Hari lain (bunkering/waiting)",
-                    "Konsumsi bahan bakar utama total",
-                    "Konsumsi bahan bakar sekunder total",
+                    "Konsumsi bahan bakar",
                 ],
                 "Nilai": [
                     f"{sea_days_laden:,.2f} hari",
                     f"{sea_days_ballast:,.2f} hari",
                     f"{total_port_days:,.2f} hari",
-                    f"{canal_days:,.2f} hari",
                     f"{other_days:,.2f} hari",
-                    f"{ifo_qty:,.1f} MT",
-                    f"{mdo_qty:,.1f} MT",
+                    f"{total_fuel_qty:,.1f} MT",
                 ],
             }
         )
@@ -632,7 +403,7 @@ hire — untuk voyage domestik maupun internasional.
             go.Waterfall(
                 orientation="v",
                 measure=["absolute", "relative", "relative", "relative", "relative", "total"],
-                x=["Gross Freight", "Komisi", "Bunker", "Biaya Pelabuhan", "Kanal/Lain", "Net Result"],
+                x=["Gross Freight", "Komisi", "Bunker", "Biaya Pelabuhan", "Lain-lain", "Net Result"],
                 y=[
                     gross_freight,
                     -commission_amount,
@@ -823,10 +594,3 @@ Berlaku universal untuk fixture domestik maupun internasional.
         "Metodologi: Handybulk — Laytime, Calculation of Demurrage, Laytime/Demurrage/Despatch Explained. "
         "Konvensi despatch 50%: Heisenberg Shipping — Online Laytime Calculator Tool."
     )
-
-st.markdown("---")
-st.caption(
-    "Tanker Chartering Toolkit (Merged, disesuaikan pasar Indonesia) • Alat bantu estimasi, "
-    "bukan pengganti perhitungan chartering resmi. Selalu verifikasi ulang sebelum fixture. "
-    "Dibangun dengan Streamlit."
-)
