@@ -50,17 +50,6 @@ tab_ws, tab_voy, tab_lay = st.tabs(
 # ==============================================================================
 with tab_ws:
     st.subheader("⚓ Worldscale Freight Calculation")
-    st.markdown(
-        """
-<div style="text-align: justify; text-justify: inter-word;">
-(Worldwide Tanker Nominal Freight Scale)<br>
-Sistem indeks acuan atau daftar tarif standar yang digunakan untuk menentukan biaya pengangkutan kargo minyak dan produk turunannya menggunakan kapal tanker. Worldscale adalah tabel referensi tarif dasar (flat rate) per ton untuk ratusan ribu rute pelayaran di seluruh dunia. Tarif dasar dihitung berdasarkan asumsi kapal standar berukuran 75.000 deadweight tonnage (DWT), kecepatan 14,5 knot, biaya operasional harian tetap (sebesar $12.000), serta estimasi biaya bahan bakar (bunker) dan pelabuhan. Negosiasi harga antara pemilik kapal (shipowner) dan penyewa (charterer) dilakukan berdasarkan persentase dari tarif dasar Worldscale (disebut WS points). Contoh: WS100 berarti biaya sewa persis 100% dari tarif dasar yang tercantum. Jika pasar sedang tinggi, tarif bisa disepakati pada WS150 (150% dari tarif dasar), atau WS80 (80%) jika pasar sedang turun.
-</div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.latex(r"\text{Freight (USD)} = \text{Cargo Qty (MT)} \times \text{Flat Rate WS100 (USD/MT)} \times \frac{\text{WS\%}}{100}")
-
     col1, col2 = st.columns(2)
     with col1:
         ws_qty = st.number_input(
@@ -470,17 +459,7 @@ with tab_voy:
 # TAB 3 — LAYTIME & DEMURRAGE/DESPATCH CALCULATOR
 # ==============================================================================
 with tab_lay:
-    st.subheader("⏱️ Laytime & Demurrage/Despatch Calculator")
-    st.markdown(
-        """
-**Laytime** adalah waktu yang dialokasikan ke Charterer untuk cargo operations.
-Jika waktu terpakai **melebihi** allowed laytime → kapal *on demurrage* (Owner
-dibayar). Jika **lebih cepat** → *despatch* (Owner membayar Charterer), bila
-charter party memberi hak despatch — konvensi umum: despatch rate = 50% demurrage rate.
-Berlaku universal untuk fixture domestik maupun internasional.
-        """
-    )
-
+    st.subheader("⏱️ Laytime & Demurrage/Despatch Calculation")
     lay_currency = st.radio(
         "Mata uang", ["USD ($)", "IDR (Rp)"], horizontal=True, key="lay_currency"
     )
