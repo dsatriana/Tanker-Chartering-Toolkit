@@ -7,7 +7,7 @@ Tiga modul dalam satu aplikasi Streamlit:
   2. Voyage Estimate & TCE Calculation — freight, bunker, biaya pelabuhan, dan waktu voyage
                                         menjadi TCE, dengan toggle Domestik/Internasional
                                         dan toggle mata uang USD/IDR.
-  3. Laytime & Demurrage     — allowed laytime, waktu terpakai, demurrage.
+  3. Laytime & Demurrage               — allowed laytime, waktu terpakai, demurrage.
 
 Nama pelabuhan load/discharge diisi manual (diketik).
 """
@@ -547,8 +547,9 @@ with tab_lay:
         r3.metric("Selisih", f"+{diff_hours:.2f} jam", delta=f"{demurrage_days:.3f} hari on demurrage")
         st.error(f"🔴 **ON DEMURRAGE** — Demurrage payable: **{lay_symbol} {demurrage_amt:,.2f}**")
     elif diff_hours < 0:
-        r3.metric("Selisih", f"{diff_hours:.2f} jam", delta=f"{abs(diff_hours)/24:.3f} hari tersisa")
-        st.info("🟢 **WITHIN LAYTIME** — Cargo operations selesai sebelum allowed laytime. Tidak ada demurrage.")
+        saved_days = abs(diff_hours) / 24.0
+        r3.metric("Selisih", f"{diff_hours:.2f} jam", delta=f"{saved_days:.3f} hari lebih cepat")
+        st.info(f"🟢 Cargo ops selesai lebih cepat {saved_days:.3f} hari dari allowed laytime — tidak ada demurrage.")
     else:
         r3.metric("Selisih", "0.00 jam")
         st.info("⚪ Laytime terpakai persis sama dengan allowed laytime — tidak ada demurrage.")
