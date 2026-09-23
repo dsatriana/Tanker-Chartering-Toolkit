@@ -7,7 +7,7 @@ Tiga modul dalam satu aplikasi Streamlit:
   2. Voyage Estimate & TCE Calculation — freight, bunker, biaya pelabuhan, dan waktu voyage
                                         menjadi TCE, dengan toggle Domestik/Internasional
                                         dan toggle mata uang USD/IDR.
-  3. Laytime & Demurrage               — allowed laytime, waktu terpakai, demurrage.
+  3. Laytime & Demurrage     — allowed laytime, waktu terpakai, demurrage.
 
 Nama pelabuhan load/discharge diisi manual (diketik).
 """
@@ -35,7 +35,7 @@ st.set_page_config(
 DEFAULT_FX_IDR_PER_USD = 17_700.0
 
 st.title("🛢️ Tanker Chartering Toolkit")
-st.caption("Worldscale freight · Voyage estimate (TCE) · Laytime & demurrage/despatch")
+st.caption("Worldscale freight · Voyage estimate (TCE) · Laytime & demurrage")
 
 tab_ws, tab_voy, tab_lay = st.tabs(
     [
@@ -456,7 +456,7 @@ with tab_voy:
             st.warning("Lengkapi data voyage days, cargo quantity, dan komisi (<100%) terlebih dahulu.")
 
 # ==============================================================================
-# TAB 3 — LAYTIME & DEMURRAGE/DESPATCH CALCULATOR
+# TAB 3 — LAYTIME & DEMURRAGE CALCULATOR
 # ==============================================================================
 with tab_lay:
     st.subheader("⏱️ Laytime & Demurrage Calculation")
@@ -547,9 +547,8 @@ with tab_lay:
         r3.metric("Selisih", f"+{diff_hours:.2f} jam", delta=f"{demurrage_days:.3f} hari on demurrage")
         st.error(f"🔴 **ON DEMURRAGE** — Demurrage payable: **{lay_symbol} {demurrage_amt:,.2f}**")
     elif diff_hours < 0:
-        saved_days = abs(diff_hours) / 24.0
-        r3.metric("Selisih", f"{diff_hours:.2f} jam", delta=f"{saved_days:.3f} hari lebih cepat")
-        st.info(f"🟢 Cargo ops selesai lebih cepat {saved_days:.3f} hari dari allowed laytime — tidak ada demurrage.")
+        r3.metric("Selisih", f"{diff_hours:.2f} jam", delta=f"{abs(diff_hours)/24:.3f} hari tersisa")
+        st.info("🟢 **WITHIN LAYTIME** — Cargo operations selesai sebelum allowed laytime. Tidak ada demurrage.")
     else:
         r3.metric("Selisih", "0.00 jam")
         st.info("⚪ Laytime terpakai persis sama dengan allowed laytime — tidak ada demurrage.")
